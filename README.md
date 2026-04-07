@@ -1,4 +1,4 @@
-# WAXAL-Dual-Core
+# SOMAX
 
 **Eliminating the Tokenization Tax for African Languages via Dual-Stream Tokenization**
 
