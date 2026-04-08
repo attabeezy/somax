@@ -14,6 +14,13 @@ import json
 import pickle
 from pathlib import Path
 
+# Mirrors download.py DATASET_CONFIGS — must stay in sync.
+LANG_FILE_PREFIXES: dict[str, dict[str, str | None]] = {
+    "akan":    {"asr": "aka_asr", "tts": "twi_tts"},
+    "yoruba":  {"asr": None,      "tts": "yor_tts"},
+    "swahili": {"asr": None,      "tts": "swa_tts"},
+}
+
 
 def load_labeled_texts(data_dir: Path, language: str) -> tuple[list[str], list[int]]:
     """Load ASR and TTS texts with stream labels.
@@ -29,12 +36,14 @@ def load_labeled_texts(data_dir: Path, language: str) -> tuple[list[str], list[i
     """
     texts, labels = [], []
 
-    lang_prefix = "twi" if language == "akan" else language
-
-    asr_file = data_dir / "aka_asr_train.jsonl" if language == "akan" else data_dir / f"{language}_asr_train.jsonl"
-    tts_file = data_dir / f"{lang_prefix}_tts_train.jsonl"
+    prefixes = LANG_FILE_PREFIXES[language]
+    asr_file = data_dir / f"{prefixes['asr']}_train.jsonl" if prefixes["asr"] else None
+    tts_file = data_dir / f"{prefixes['tts']}_train.jsonl"
 
     for path, label in [(asr_file, 0), (tts_file, 1)]:
+        if path is None:
+            print(f"No {'ASR' if label == 0 else 'TTS'} config for {language}, skipping.")
+            continue
         if not path.exists():
             print(f"WARNING: {path} not found, skipping.")
             continue

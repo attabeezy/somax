@@ -13,7 +13,7 @@ Usage:
     python scripts/export_gguf.py --checkpoint checkpoints/variant_D/final/ --output models/gguf/
 
     # Convert base tokenizer
-    python scripts/03_export_gguf.py --checkpoint meta-llama/Llama-3.2-1B --output models/gguf/ --base-only
+    python scripts/export_gguf.py --checkpoint meta-llama/Llama-3.2-1B --output models/gguf/ --base-only
 """
 
 import argparse
@@ -97,122 +97,88 @@ def merge_lora_model(checkpoint_dir: Path, output_dir: Path) -> Path:
     return merged_dir
 
 
+def find_llama_cpp() -> tuple[Path, Path] | None:
+    """Locate llama.cpp conversion and quantization tools.
+
+    Searches for a sibling 'llama.cpp' directory relative to this script,
+    then falls back to PATH.
+
+    Returns:
+        Tuple of (convert_script, quantize_bin) paths, or None if not found.
+    """
+    # Check sibling llama.cpp directory first
+    candidates = [
+        Path(__file__).parent.parent / "llama.cpp",
+        Path.cwd() / "llama.cpp",
+    ]
+    for base in candidates:
+        convert = base / "convert-hf-to-gguf.py"
+        quantize = base / "llama-quantize"
+        if not quantize.exists():
+            quantize = base / "llama-quantize.exe"
+        if convert.exists() and quantize.exists():
+            return convert, quantize
+
+    # Fall back to PATH
+    import shutil
+    quantize_bin = shutil.which("llama-quantize")
+    convert_script = shutil.which("convert-hf-to-gguf.py")
+    if quantize_bin and convert_script:
+        return Path(convert_script), Path(quantize_bin)
+
+    return None
+
+
 def convert_to_gguf(model_dir: Path, output_dir: Path, quantization: str = "Q4_K_M") -> Path:
-    """Convert merged model to GGUF format.
+    """Convert merged model to GGUF format using llama.cpp.
 
     Args:
-        model_dir: Directory containing merged model.
+        model_dir: Directory containing merged HuggingFace model.
         output_dir: Directory to save GGUF file.
-        quantization: Quantization method (Q4_K_M, Q8_0, etc.)
+        quantization: Quantization method (Q4_K_M, Q4_K_S, Q5_K_M, Q5_K_S, Q8_0).
 
     Returns:
-        Path to GGUF file.
+        Path to quantized GGUF file.
 
-    Note:
-        This requires llama.cpp to be installed or available.
-        For Colab, we'll use the huggingface_hub to upload and let others
-        handle the conversion, or use a conversion script.
+    Raises:
+        FileNotFoundError: If llama.cpp tools are not found.
+        subprocess.CalledProcessError: If conversion or quantization fails.
     """
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    tools = find_llama_cpp()
+    if tools is None:
+        raise FileNotFoundError(
+            "llama.cpp tools not found. Either:\n"
+            "  1. Clone llama.cpp into a sibling directory:  git clone https://github.com/ggerganov/llama.cpp\n"
+            "     then build it: cd llama.cpp && make\n"
+            "  2. Add llama-quantize and convert-hf-to-gguf.py to PATH"
+        )
+
+    convert_script, quantize_bin = tools
+    fp16_path = output_dir / "model-f16.gguf"
+    gguf_path = output_dir / f"model-{quantization}.gguf"
+
+    print(f"Converting to GGUF (FP16)...")
+    subprocess.run(
+        [sys.executable, str(convert_script), str(model_dir), "--outfile", str(fp16_path), "--outtype", "f16"],
+        check=True,
+    )
+    print(f"FP16 GGUF saved to: {fp16_path}")
+
+    print(f"Quantizing to {quantization}...")
     try:
-        from transformers import AutoTokenizer
+        subprocess.run(
+            [str(quantize_bin), str(fp16_path), str(gguf_path), quantization],
+            check=True,
+        )
+    finally:
+        if fp16_path.exists():
+            fp16_path.unlink()
+    print(f"Quantized GGUF saved to: {gguf_path}")
 
-        print(f"Preparing GGUF conversion...")
+    return gguf_path
 
-        output_dir.mkdir(parents=True, exist_ok=True)
-
-        gguf_path = output_dir / f"model-{quantization}.gguf"
-
-        print("Note: Full GGUF conversion requires llama.cpp.")
-        print("For Colab, use the following approach:")
-        print("1. Upload merged model to HuggingFace Hub")
-        print("2. Use llama.cpp locally or via API for conversion")
-        print()
-        print("Alternative: Use llama-cpp-python for inference directly:")
-        print(f"    model = Llama(model_path='{model_dir}')")
-
-        return gguf_path
-
-    except ImportError:
-        raise ImportError("transformers required. Install with: pip install transformers")
-
-
-def create_gguf_conversion_script(output_dir: Path) -> Path:
-    """Create a helper script for GGUF conversion.
-
-    Args:
-        output_dir: Directory to save the script.
-
-    Returns:
-        Path to the conversion script.
-    """
-    script_content = '''#!/usr/bin/env python3
-"""GGUF conversion helper script.
-
-This script uses llama.cpp's convert script to convert a HuggingFace model
-to GGUF format with quantization.
-
-Prerequisites:
-    git clone https://github.com/ggerganov/llama.cpp
-    cd llama.cpp && make
-
-Usage:
-    python convert_to_gguf.py --model-dir merged_model/ --output model.gguf --quantize Q4_K_M
-"""
-
-import argparse
-import subprocess
-from pathlib import Path
-
-
-def main():
-    parser = argparse.ArgumentParser(description="Convert model to GGUF")
-    parser.add_argument("--model-dir", type=str, required=True)
-    parser.add_argument("--output", type=str, default="model.gguf")
-    parser.add_argument("--quantize", type=str, default="Q4_K_M",
-                        choices=["Q4_K_M", "Q4_K_S", "Q5_K_M", "Q5_K_S", "Q8_0"])
-    parser.add_argument("--llama-cpp-dir", type=str, default="llama.cpp")
-    args = parser.parse_args()
-
-    model_dir = Path(args.model_dir)
-    output_file = Path(args.output)
-    llama_cpp = Path(args.llama_cpp_dir)
-
-    convert_script = llama_cpp / "convert-hf-to-gguf.py"
-    if not convert_script.exists():
-        raise FileNotFoundError(f"llama.cpp convert script not found at {convert_script}")
-
-    # Convert to GGUF (FP16)
-    gguf_fp16 = output_file.with_suffix(".fp16.gguf")
-    subprocess.run([
-        sys.executable, str(convert_script),
-        str(model_dir),
-        "--outfile", str(gguf_fp16),
-        "--outtype", "f16"
-    ], check=True)
-
-    # Quantize
-    quantize_bin = llama_cpp / "llama-quantize"
-    subprocess.run([
-        str(quantize_bin),
-        str(gguf_fp16),
-        str(output_file),
-        args.quantize
-    ], check=True)
-
-    print(f"GGUF model saved to: {output_file}")
-    gguf_fp16.unlink()
-
-
-if __name__ == "__main__":
-    import sys
-    main()
-'''
-
-    script_path = output_dir / "convert_to_gguf.py"
-    with open(script_path, "w") as f:
-        f.write(script_content)
-
-    return script_path
 
 
 def main() -> None:
@@ -244,13 +210,7 @@ def main() -> None:
     if args.base_only or is_base_model:
         print(f"Using base model directly: {args.checkpoint}")
         print("No LoRA merge required.")
-
-        model_dir = args.checkpoint
-
-        converter_script = create_gguf_conversion_script(output_dir)
-        print(f"\nGGUF converter script created: {converter_script}")
-        print("\nTo convert to GGUF, run:")
-        print(f"  python {converter_script} --model-dir {model_dir} --output model.gguf")
+        convert_to_gguf(Path(args.checkpoint), output_dir, args.quantization)
         return
 
     if not checkpoint_path.exists():
@@ -270,11 +230,7 @@ def main() -> None:
         return
 
     gguf_path = convert_to_gguf(merged_dir, output_dir, args.quantization)
-
-    converter_script = create_gguf_conversion_script(output_dir)
-    print(f"\nGGUF converter script created: {converter_script}")
-    print("\nTo complete conversion, run locally:")
-    print(f"  python {converter_script} --model-dir {merged_dir} --output {gguf_path}")
+    print(f"\nDone. GGUF model: {gguf_path}")
 
 
 if __name__ == "__main__":

@@ -165,6 +165,9 @@ def main() -> None:
         waxal = measure_fertility_waxal(args.waxal_tokenizer, texts)
         print_result(baseline, "Baseline")
         print_result(waxal, "WAXAL")
+        if baseline.fertility == 0.0:
+            print("\n=== ERROR: Baseline fertility is 0 — no words found in test file ===")
+            return
         reduction = (baseline.fertility - waxal.fertility) / baseline.fertility * 100
         target_met = reduction >= 30.0
         print(f"\n=== Fertility Reduction: {reduction:.1f}% {'✓ TARGET MET' if target_met else '✗ target: ≥30%'} ===")
@@ -182,11 +185,10 @@ def main() -> None:
         parser.error("Provide --tokenizer or --waxal-tokenizer")
 
     if args.output:
-        import json as _json
         output_path = Path(args.output)
         output_path.parent.mkdir(parents=True, exist_ok=True)
         with open(output_path, "w") as f:
-            _json.dump(results, f, indent=2)
+            json.dump(results, f, indent=2)
         print(f"\nResults saved to: {output_path}")
 
 

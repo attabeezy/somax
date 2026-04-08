@@ -16,42 +16,47 @@ Modern LLM tokenizers are optimized for English, resulting in a **"Tokenization 
 ## Key Components
 
 ### 1. **WAXALRouter** (`somax/router.py`)
-Lightweight heuristic classifier that routes input to the appropriate stream:
+Lightweight stream classifier that routes input to the appropriate linguistic regime:
 - **Robust stream** (ASR-optimized): Handles conversational text, fillers, code-switching
 - **Logic stream** (TTS-optimized): Handles formal, semantic-rich text
 
+Uses a trained TF-IDF + logistic regression classifier when available; falls back to a
+regex heuristic for zero-dependency environments.
+
 ### 2. **DualCoreTokenizer** (`somax/tokenizer.py`)
-Manages stream-aware tokenization using a **Unified Vocabulary**. Both streams share a single BPE vocabulary to ensure embedding alignment, while the router identifies the linguistic regime for downstream model selection.
+Manages stream-aware tokenization using a **Unified 8k BPE Vocabulary**. Both streams share
+a single vocabulary trained on combined WAXAL ASR+TTS data, ensuring compatible token IDs
+and embedding alignment across all model variants.
 
 ### 3. **Training Pipeline** (`scripts/`)
-- `download.py` - Download WAXAL dataset from HuggingFace
-- `train_bpe.py` - Train unified BPE vocabulary for ASR/TTS
-- `train_router.py` - Train the TF-IDF router classifier
-- `train_lora.py` - Train LoRA variants (A, B, C, D, E)
-- `export_gguf.py` - Export to GGUF for edge deployment
+- `download.py` - Download WAXAL dataset from HuggingFace (`google/WaxalNLP`)
+- `train_bpe.py` - Train unified 8k BPE vocabulary with causal LM special tokens
+- `train_router.py` - Train the TF-IDF + logistic regression router classifier
+- `train_lora.py` - Train LoRA variants (A–E) with optional WAXAL tokenizer and embedding warm-init
+- `export_gguf.py` - Merge LoRA adapters and export to GGUF via llama.cpp
 
 ## Quick Start
 
 ### Prerequisites
 
 ```bash
-# Core dependencies
-pip install transformers peft bitsandbytes datasets accelerate
-pip install torch sentencepiece tokenizers
-
-# For edge deployment
-pip install llama-cpp-python psutil
-
-# For development
+# Install all dependencies
 pip install -e ".[dev,train]"
+
+# Or install manually:
+# Core
+pip install transformers tokenizers llama-cpp-python psutil
+# Training (cloud)
+pip install peft bitsandbytes datasets accelerate torch sentencepiece
 ```
+
+A HuggingFace account with access approved for `meta-llama/Llama-3.2-1B` is required.
 
 ### Option 1: Run End-to-End in Google Colab
 
-1. Open `notebooks/pipeline.ipynb` in VS Code
-2. Install the Colab extension
-3. Set your HuggingFace token: `os.environ['HF_TOKEN'] = 'your_token'`
-4. Run all cells
+1. Open `notebooks/pipeline.ipynb` in VS Code or upload to Colab
+2. Run cell 1 — it will prompt for your HuggingFace token via a secure widget
+3. Run all remaining cells in order
 
 ### Option 2: Run Locally
 
@@ -59,21 +64,37 @@ pip install -e ".[dev,train]"
 # 1. Download WAXAL dataset (Akan)
 python scripts/download.py --lang akan --output data/
 
-# 2. Train unified BPE vocabulary
+# 2. Train unified BPE vocabulary (8k tokens, adds causal LM special tokens)
 python scripts/train_bpe.py --input data/akan/ --output models/tokenizers/
 
-# 3. Train LoRA variant (D recommended)
-python scripts/train_lora.py --group D --data data/akan/ --output checkpoints/
+# 3. Train router classifier
+python scripts/train_router.py --data data/akan/ --output models/router/
 
-# 4. Benchmark fertility results
-python benchmark_fertility.py --tokenizer meta-llama/Llama-3.2-1B \
-    --waxal-tokenizer models/tokenizers/akan/unified_tokenizer.json --test-file data/akan/twi_tts_test.jsonl --compare
+# 4. Train LoRA variant D with WAXAL tokenizer (recommended)
+#    --tokenizer-path connects the custom vocabulary to the model embeddings
+python scripts/train_lora.py \
+    --group D \
+    --data data/akan/ \
+    --output checkpoints/ \
+    --tokenizer-path models/tokenizers/akan/unified_tokenizer.json
 
-# 5. Export to GGUF (requires llama.cpp)
-python scripts/export_gguf.py --checkpoint checkpoints/variant_D/final/ --output models/gguf/
+# 5. Benchmark fertility reduction
+python benchmark_fertility.py \
+    --tokenizer meta-llama/Llama-3.2-1B \
+    --waxal-tokenizer models/tokenizers/akan/unified_tokenizer.json \
+    --test-file data/akan/twi_tts_test.jsonl \
+    --compare
 
-# 6. Benchmark edge inference
-python benchmark_inference.py --model models/gguf/variant_D_Q4.gguf --test-file data/akan/twi_tts_test.jsonl
+# 6. Export to GGUF (requires llama.cpp built from source)
+python scripts/export_gguf.py \
+    --checkpoint checkpoints/variant_D/final/ \
+    --output models/gguf/ \
+    --quantization Q4_K_M
+
+# 7. Benchmark edge inference (run on Dell Latitude 7400)
+python benchmark_inference.py \
+    --model models/gguf/model-Q4_K_M.gguf \
+    --test-file data/akan/twi_tts_test.jsonl
 ```
 
 ## Dataset
@@ -162,7 +183,7 @@ from somax import DualCoreTokenizer
 # Initialize with unified tokenizer
 tokenizer = DualCoreTokenizer(
     tokenizer_path="models/tokenizers/akan/unified_tokenizer.json",
-    language="akan"
+    language="akan",
 )
 
 # Automatic routing based on input
@@ -173,8 +194,12 @@ formal = "The president delivered a formal address"  # Routed to TTS stream
 print(tokenizer.classify(conversational))  # "robust"
 print(tokenizer.classify(formal))           # "logic"
 
-# Encode
+# Encode (returns token IDs from the unified 8k WAXAL vocabulary)
 tokens = tokenizer.encode(conversational)
+
+# Encode and get stream classification in one call
+ids, stream = tokenizer.encode_with_stream(conversational)
+print(stream)  # "robust" — use this to select the correct LoRA adapter at inference
 ```
 
 ## Results
@@ -197,9 +222,10 @@ Expected improvement:
 
 - [x] Project skeleton
 - [x] Dataset integration (WaxalNLP)
-- [x] Training scripts (LoRA variants)
+- [x] Training scripts (LoRA variants A–E)
 - [x] Edge library (router + tokenizer)
 - [x] Colab notebook
+- [x] Tokenizer-embedding alignment fix (custom 8k BPE connected to model training via warm-init)
 - [ ] Benchmark on edge hardware (Dell Latitude 7400)
 - [ ] Open-source model release
 

@@ -12,7 +12,7 @@ def mock_tokenizer_file(tmp_path):
     
     tokenizer = Tokenizer(BPE(unk_token="[UNK]"))
     tokenizer.pre_tokenizer = Whitespace()
-    trainer = BpeTrainer(special_tokens=["[PAD]", "[UNK]", "[CLS]", "[SEP]", "[MASK]"])
+    trainer = BpeTrainer(special_tokens=["[PAD]", "[UNK]", "[CLS]", "[SEP]", "[MASK]", "<s>", "</s>", "<pad>"])
     
     # Train on some dummy data to make it functional
     tokenizer.train_from_iterator(["hello world", "this is a test"], trainer=trainer)

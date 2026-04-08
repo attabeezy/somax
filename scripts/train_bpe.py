@@ -21,6 +21,13 @@ from tokenizers.trainers import BpeTrainer
 from tokenizers.pre_tokenizers import Whitespace
 from tokenizers import Tokenizer
 
+# Mirrors download.py DATASET_CONFIGS — must stay in sync.
+LANG_FILE_PREFIXES: dict[str, dict[str, str | None]] = {
+    "akan":    {"asr": "aka_asr", "tts": "twi_tts"},
+    "yoruba":  {"asr": None,      "tts": "yor_tts"},
+    "swahili": {"asr": None,      "tts": "swa_tts"},
+}
+
 
 def read_jsonl_texts(jsonl_path: Path) -> Iterator[str]:
     """Yield transcription/text strings from a JSONL file."""
@@ -73,7 +80,16 @@ def train_unified_tokenizer(
 
     trainer = BpeTrainer(
         vocab_size=vocab_size,
-        special_tokens=["[PAD]", "[UNK]", "[CLS]", "[SEP]", "[MASK]"],
+        special_tokens=[
+            "[PAD]",  # 0 — keep existing order for backward compat
+            "[UNK]",  # 1
+            "[CLS]",  # 2
+            "[SEP]",  # 3
+            "[MASK]", # 4
+            "<s>",    # 5 — bos_token for causal LM
+            "</s>",   # 6 — eos_token for causal LM
+            "<pad>",  # 7 — pad_token alias for causal LM
+        ],
         show_progress=True,
     )
 
@@ -83,6 +99,19 @@ def train_unified_tokenizer(
     tokenizer_path = output_dir / "unified_tokenizer.json"
     tokenizer.save(str(tokenizer_path))
     print(f"Unified tokenizer saved to: {tokenizer_path}")
+
+    tokenizer_config = {
+        "bos_token": "<s>",
+        "eos_token": "</s>",
+        "pad_token": "<pad>",
+        "unk_token": "[UNK]",
+        "model_max_length": 8192,
+        "tokenizer_class": "PreTrainedTokenizerFast",
+    }
+    config_path = output_dir / "tokenizer_config.json"
+    with open(config_path, "w", encoding="utf-8") as f:
+        json.dump(tokenizer_config, f, indent=2)
+    print(f"Tokenizer config saved to: {config_path}")
 
     print("Computing per-stream token statistics...")
     asr_counts = collect_token_counts(asr_texts, tokenizer)
@@ -141,17 +170,19 @@ def main() -> None:
     if not input_dir.exists():
         raise FileNotFoundError(f"Input directory not found: {input_dir}")
 
-    lang_prefix = "twi" if args.language == "akan" else args.language
-    asr_file = input_dir / ("aka_asr_train.jsonl" if args.language == "akan" else f"{args.language}_asr_train.jsonl")
-    tts_file = input_dir / f"{lang_prefix}_tts_train.jsonl"
+    prefixes = LANG_FILE_PREFIXES[args.language]
+    asr_file = input_dir / f"{prefixes['asr']}_train.jsonl" if prefixes["asr"] else None
+    tts_file = input_dir / f"{prefixes['tts']}_train.jsonl"
 
     asr_texts, tts_texts = [], []
 
-    if asr_file.exists():
+    if asr_file and asr_file.exists():
         asr_texts = list(read_jsonl_texts(asr_file))
         print(f"ASR: {len(asr_texts)} samples from {asr_file}")
-    else:
+    elif asr_file:
         print(f"WARNING: ASR file not found: {asr_file}")
+    else:
+        print(f"No ASR config for {args.language}, skipping.")
 
     if tts_file.exists():
         tts_texts = list(read_jsonl_texts(tts_file))

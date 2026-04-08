@@ -27,6 +27,7 @@ import yaml
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
+    PreTrainedTokenizerFast,
     TrainingArguments,
     Trainer,
     DataCollatorForLanguageModeling,
@@ -107,7 +108,6 @@ def prepare_dataset(texts: list[str], tokenizer, max_length: int = 512) -> Datas
             truncation=True,
             max_length=max_length,
             padding="max_length",
-            return_tensors="pt",
         )
 
     dataset = Dataset.from_dict({"text": texts})
@@ -151,28 +151,113 @@ def train_stage(
     print(f"Stage {stage_num} complete.")
 
 
+def initialize_embeddings_from_llama(
+    model,
+    waxal_tokenizer: PreTrainedTokenizerFast,
+    llama_tokenizer,
+    llama_embed_snapshot: torch.Tensor,
+) -> None:
+    """Warm-initialize the resized embedding table using Llama token averages.
+
+    For each WAXAL token string, tokenizes it with the Llama tokenizer, retrieves
+    the corresponding rows from the pre-resize Llama embedding snapshot, and averages
+    them. Tokens that produce empty Llama encodings fall back to the snapshot mean.
+    Both embed_tokens and lm_head are initialized identically.
+
+    Args:
+        model: The model after resize_token_embeddings() has been called.
+        waxal_tokenizer: The loaded WAXAL PreTrainedTokenizerFast (8k vocab).
+        llama_tokenizer: The original Llama AutoTokenizer used for lookup only.
+        llama_embed_snapshot: Full Llama embedding matrix snapshotted BEFORE resize,
+                              shape [128256, hidden_size], on CPU.
+    """
+    print("Warm-initializing embedding table from Llama token averages...")
+    mean_embed = llama_embed_snapshot.mean(dim=0)
+    waxal_vocab = waxal_tokenizer.get_vocab()
+    fallback_count = 0
+
+    embed_layer = model.get_input_embeddings()
+    lm_head = model.get_output_embeddings()
+    dtype = embed_layer.weight.dtype
+
+    with torch.no_grad():
+        new_embed = embed_layer.weight.clone()
+        new_lm_head = lm_head.weight.clone()
+
+        for token_str, waxal_id in waxal_vocab.items():
+            llama_ids = llama_tokenizer.encode(token_str, add_special_tokens=False)
+            valid_ids = [i for i in llama_ids if i < llama_embed_snapshot.shape[0]]
+            if valid_ids:
+                init_vec = llama_embed_snapshot[valid_ids].mean(dim=0)
+            else:
+                init_vec = mean_embed
+                fallback_count += 1
+            new_embed[waxal_id] = init_vec.to(dtype)
+            new_lm_head[waxal_id] = init_vec.to(dtype)
+
+        embed_layer.weight.copy_(new_embed)
+        lm_head.weight.copy_(new_lm_head)
+
+    print(f"  Initialized {len(waxal_vocab)} rows. Fallback to mean: {fallback_count} tokens.")
+
+
 def train_variant(
     model_id: str,
     data_dir: Path,
     output_dir: Path,
     configs: list[TrainingConfig],
     lora_cfg: dict,
+    language: str = "akan",
+    tokenizer_path: Path | None = None,
 ) -> None:
     """Train a variant through one or more staged training runs.
 
     Handles both single-stage variants (A, B, C) and multi-stage variants
     (D: TTS->ASR->TTS, E: ASR->TTS) with the same code path.
+
+    When tokenizer_path is provided, the custom WAXAL BPE tokenizer replaces
+    the Llama tokenizer. Model embeddings are resized and warm-initialized from
+    Llama token averages so training converges within the T4 time budget.
     """
     print(f"\nLoading model: {model_id}")
 
-    tokenizer = AutoTokenizer.from_pretrained(model_id)
-    tokenizer.pad_token = tokenizer.eos_token
+    if tokenizer_path is not None:
+        if not tokenizer_path.exists():
+            raise FileNotFoundError(f"WAXAL tokenizer not found: {tokenizer_path}")
+        print(f"Loading WAXAL tokenizer: {tokenizer_path}")
+        llama_tokenizer = AutoTokenizer.from_pretrained(model_id)
+        tokenizer = PreTrainedTokenizerFast(
+            tokenizer_file=str(tokenizer_path),
+            bos_token="<s>",
+            eos_token="</s>",
+            pad_token="<pad>",
+            unk_token="[UNK]",
+        )
+        use_custom_tokenizer = True
+        print(f"WAXAL vocab size: {len(tokenizer)}")
+    else:
+        llama_tokenizer = AutoTokenizer.from_pretrained(model_id)
+        llama_tokenizer.pad_token = llama_tokenizer.eos_token
+        tokenizer = llama_tokenizer
+        use_custom_tokenizer = False
 
     model = AutoModelForCausalLM.from_pretrained(
         model_id,
         torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
         device_map="auto",
     )
+
+    if use_custom_tokenizer:
+        # Snapshot FULL Llama embeddings BEFORE resize — resize truncates to 8k rows,
+        # making Llama IDs > 7999 unreachable from the weight matrix.
+        with torch.no_grad():
+            llama_embed_snapshot = model.get_input_embeddings().weight.detach().clone().cpu()
+
+        print(f"Resizing embeddings: {llama_tokenizer.vocab_size} -> {len(tokenizer)}")
+        model.resize_token_embeddings(len(tokenizer))
+        initialize_embeddings_from_llama(model, tokenizer, llama_tokenizer, llama_embed_snapshot)
+
+        del llama_embed_snapshot, llama_tokenizer  # free memory before LoRA wrapping
 
     lora_config = LoraConfig(
         task_type=TaskType.CAUSAL_LM,
@@ -181,15 +266,22 @@ def train_variant(
         lora_dropout=lora_cfg.get("lora_dropout", 0.1),
         bias=lora_cfg.get("bias", "none"),
         target_modules=lora_cfg.get("target_modules", ["q_proj", "k_proj", "v_proj", "o_proj"]),
+        modules_to_save=["embed_tokens", "lm_head"] if use_custom_tokenizer else None,
     )
 
     model = get_peft_model(model, lora_config)
     model.print_trainable_parameters()
 
-    asr_file = data_dir / "aka_asr_train.jsonl"
-    tts_file = data_dir / "twi_tts_train.jsonl"
+    _LANG_FILE_PREFIXES = {
+        "akan":    {"asr": "aka_asr", "tts": "twi_tts"},
+        "yoruba":  {"asr": None,      "tts": "yor_tts"},
+        "swahili": {"asr": None,      "tts": "swa_tts"},
+    }
+    prefixes = _LANG_FILE_PREFIXES.get(language, {"asr": language, "tts": language})
+    asr_file = data_dir / f"{prefixes['asr']}_train.jsonl" if prefixes["asr"] else None
+    tts_file = data_dir / f"{prefixes['tts']}_train.jsonl"
 
-    asr_texts = load_jsonl_texts(asr_file) if asr_file.exists() else []
+    asr_texts = load_jsonl_texts(asr_file) if (asr_file and asr_file.exists()) else []
     tts_texts = load_jsonl_texts(tts_file) if tts_file.exists() else []
 
     if asr_texts:
@@ -226,7 +318,14 @@ def main() -> None:
         help="Training variant to execute",
     )
     parser.add_argument("--model", type=str, default=None, help="Override base model ID from config")
+    parser.add_argument(
+        "--tokenizer-path",
+        type=str,
+        default=None,
+        help="Path to WAXAL unified_tokenizer.json. Resizes model embeddings with warm init from Llama.",
+    )
     parser.add_argument("--data", type=str, default="data/akan/")
+    parser.add_argument("--language", type=str, default="akan", choices=["akan", "yoruba", "swahili"])
     parser.add_argument("--output", type=str, default="checkpoints/")
     parser.add_argument(
         "--config",
@@ -263,7 +362,15 @@ def main() -> None:
         print("Control group: No training required. Use base model directly.")
         return
 
-    train_variant(model_id, data_dir, output_dir, configs, lora_cfg)
+    train_variant(
+        model_id,
+        data_dir,
+        output_dir,
+        configs,
+        lora_cfg,
+        language=args.language,
+        tokenizer_path=Path(args.tokenizer_path) if args.tokenizer_path else None,
+    )
     print("\n=== Training complete ===")
 
 

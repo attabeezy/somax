@@ -51,7 +51,13 @@ class DualCoreTokenizer:
             raise FileNotFoundError(f"Tokenizer not found: {tokenizer_file}")
 
         self.router = WAXALRouter(language=language, model_dir=router_model_dir)
-        self._tokenizer = PreTrainedTokenizerFast(tokenizer_file=str(tokenizer_file))
+        self._tokenizer = PreTrainedTokenizerFast(
+            tokenizer_file=str(tokenizer_file),
+            bos_token="<s>",
+            eos_token="</s>",
+            pad_token="<pad>",
+            unk_token="[UNK]",
+        )
 
         stats_path = tokenizer_file.parent / "stream_token_stats.json"
         self.stream_token_stats: dict = {}

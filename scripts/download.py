@@ -6,7 +6,7 @@ Dataset: google/WaxalNLP from HuggingFace
 Dataset splits: ASR (spontaneous), TTS (formal)
 
 Usage:
-    python scripts/00_download_data.py --lang akan --output data/
+    python scripts/download.py --lang akan --output data/
 
 Language configs:
     - akan: aka_asr + twi_tts
