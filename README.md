@@ -5,6 +5,14 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 
+## Notebooks
+
+| Notebook | Colab | Kaggle |
+|----------|-------|--------|
+| `notebooks/data_setup.ipynb` | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/attabeezy/somax/blob/main/notebooks/data_setup.ipynb) | [![Open In Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/kernels/welcome?src=https://github.com/attabeezy/somax/blob/main/notebooks/data_setup.ipynb) |
+| `notebooks/pipeline.ipynb` | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/attabeezy/somax/blob/main/notebooks/pipeline.ipynb) | [![Open In Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/kernels/welcome?src=https://github.com/attabeezy/somax/blob/main/notebooks/pipeline.ipynb) |
+| `notebooks/train_eval.ipynb` | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/attabeezy/somax/blob/main/notebooks/train_eval.ipynb) | [![Open In Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/kernels/welcome?src=https://github.com/attabeezy/somax/blob/main/notebooks/train_eval.ipynb) |
+
 ## Overview
 
 Modern LLM tokenizers are optimized for English, resulting in a **"Tokenization Tax"** for African languages like Akan, Yoruba, and Swahili. This project implements a research-to-production framework that:
