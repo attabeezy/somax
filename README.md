@@ -9,8 +9,6 @@
 
 | Notebook | Colab | Kaggle |
 |----------|-------|--------|
-| `notebooks/data_setup.ipynb` | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/attabeezy/somax/blob/main/notebooks/data_setup.ipynb) | [![Open In Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/kernels/welcome?src=https://github.com/attabeezy/somax/blob/main/notebooks/data_setup.ipynb) |
-| `notebooks/pipeline.ipynb` | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/attabeezy/somax/blob/main/notebooks/pipeline.ipynb) | [![Open In Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/kernels/welcome?src=https://github.com/attabeezy/somax/blob/main/notebooks/pipeline.ipynb) |
 | `notebooks/train_eval.ipynb` | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/attabeezy/somax/blob/main/notebooks/train_eval.ipynb) | [![Open In Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/kernels/welcome?src=https://github.com/attabeezy/somax/blob/main/notebooks/train_eval.ipynb) |
 
 ## Overview
@@ -62,7 +60,7 @@ A HuggingFace account with access approved for `meta-llama/Llama-3.2-1B` is requ
 
 ### Option 1: Run End-to-End in Google Colab
 
-1. Open `notebooks/pipeline.ipynb` in VS Code or upload to Colab
+1. Open `notebooks/train_eval.ipynb` in VS Code or upload to Colab
 2. Run cell 1 — it will prompt for your HuggingFace token via a secure widget
 3. Run all remaining cells in order
 
@@ -87,7 +85,7 @@ python scripts/train_lora.py \
     --tokenizer-path models/tokenizers/akan/unified_tokenizer.json
 
 # 5. Benchmark fertility reduction
-python benchmark_fertility.py \
+python scripts/benchmark_fertility.py \
     --tokenizer meta-llama/Llama-3.2-1B \
     --waxal-tokenizer models/tokenizers/akan/unified_tokenizer.json \
     --test-file data/akan/twi_tts_test.jsonl \
@@ -100,7 +98,7 @@ python scripts/export_gguf.py \
     --quantization Q4_K_M
 
 # 7. Benchmark edge inference (run on Dell Latitude 7400)
-python benchmark_inference.py \
+python scripts/benchmark_inference.py \
     --model models/gguf/model-Q4_K_M.gguf \
     --test-file data/akan/twi_tts_test.jsonl
 ```
@@ -168,15 +166,9 @@ SOMAX/
 │   ├── train_bpe.py
 │   ├── train_router.py
 │   ├── train_lora.py
-│   └── export_gguf.py
-├── somax/         # Edge Python library
-│   ├── __init__.py
-│   ├── router.py          # Stream classifier
-│   └── tokenizer.py       # Dual-core tokenizer (Unified)
-├── notebooks/             # Colab notebooks
-│   └── pipeline.ipynb
-├── benchmark_fertility.py  # Fertility metrics
-├── benchmark_inference.py  # Edge performance metrics
+│   ├── export_gguf.py
+│   ├── benchmark_fertility.py  # Fertility metrics
+│   └── benchmark_inference.py  # Edge performance metrics
 ├── requirements.txt
 ├── pyproject.toml
 ├── Makefile
@@ -216,10 +208,10 @@ After training, compare with baseline:
 
 ```bash
 # Baseline
-python benchmark_fertility.py --tokenizer meta-llama/Llama-3.2-1B --test-file data/akan/twi_tts_test.jsonl
+python scripts/benchmark_fertility.py --tokenizer meta-llama/Llama-3.2-1B --test-file data/akan/twi_tts_test.jsonl
 
 # Trained
-python benchmark_fertility.py --tokenizer models/tokenizers/akan/unified_tokenizer.json --waxal --test-file data/akan/twi_tts_test.jsonl
+python scripts/benchmark_fertility.py --tokenizer models/tokenizers/akan/unified_tokenizer.json --waxal --test-file data/akan/twi_tts_test.jsonl
 ```
 
 Expected improvement:

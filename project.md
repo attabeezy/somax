@@ -57,7 +57,9 @@ somax/
 │   ├── train_bpe.py       # Unified 8k BPE vocabulary generation
 │   ├── train_router.py    # TF-IDF + logistic regression router training
 │   ├── train_lora.py      # Staged LoRA training (all variants A–E)
-│   └── export_gguf.py     # LoRA merge + llama.cpp GGUF quantization
+│   ├── export_gguf.py     # LoRA merge + llama.cpp GGUF quantization
+│   ├── benchmark_fertility.py  # Token fertility auditing (F = tokens/words)
+│   └── benchmark_inference.py  # Edge latency / TPS / memory auditing
 ├── somax/                 # Edge Python library
 │   ├── __init__.py        # Exports WAXALRouter, DualCoreTokenizer
 │   ├── router.py          # Stream classifier (trained TF-IDF or regex fallback)
@@ -68,9 +70,7 @@ somax/
 │   ├── test_router.py
 │   └── test_tokenizer.py
 ├── notebooks/
-│   └── pipeline.ipynb     # End-to-end Colab pipeline
-├── benchmark_fertility.py # Token fertility auditing (F = tokens/words)
-├── benchmark_inference.py # Edge latency / TPS / memory auditing
+│   └── train_eval.ipynb  # End-to-end Colab pipeline
 ├── Makefile               # Pipeline shortcuts
 └── project.md             # This file
 ```
@@ -210,7 +210,7 @@ python scripts/export_gguf.py \
 ### Token Fertility
 
 ```bash
-python benchmark_fertility.py \
+python scripts/benchmark_fertility.py \
     --tokenizer meta-llama/Llama-3.2-1B \
     --waxal-tokenizer models/tokenizers/akan/unified_tokenizer.json \
     --test-file data/akan/twi_tts_test.jsonl \
@@ -222,7 +222,7 @@ Target: ≥30% fertility reduction. Expected: baseline ~4.0 → WAXAL ~2.8 token
 ### Edge Inference (Dell Latitude 7400)
 
 ```bash
-python benchmark_inference.py \
+python scripts/benchmark_inference.py \
     --model models/gguf/model-Q4_K_M.gguf \
     --test-file data/akan/twi_tts_test.jsonl
 ```

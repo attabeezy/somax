@@ -31,14 +31,14 @@ export_gguf:
 		--quantization Q4_K_M
 
 benchmark:
-	python benchmark_fertility.py \
+	python scripts/benchmark_fertility.py \
 		--tokenizer meta-llama/Llama-3.2-1B \
 		--waxal-tokenizer $(TOKENIZER_PATH) \
 		--test-file data/$(LANG)/twi_tts_test.jsonl \
 		--compare
 
 benchmark_edge:
-	python benchmark_inference.py \
+	python scripts/benchmark_inference.py \
 		--model models/gguf/model-Q4_K_M.gguf \
 		--test-file data/$(LANG)/twi_tts_test.jsonl
 

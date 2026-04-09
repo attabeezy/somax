@@ -9,13 +9,13 @@ to quantify the reduction in the Tokenization Tax.
 
 Usage:
     # Baseline (Llama tokenizer)
-    python benchmark_fertility.py --tokenizer meta-llama/Llama-3.2-1B --test-file data/akan/twi_tts_test.jsonl
+    python scripts/benchmark_fertility.py --tokenizer meta-llama/Llama-3.2-1B --test-file data/akan/twi_tts_test.jsonl
 
     # WAXAL unified tokenizer
-    python benchmark_fertility.py --tokenizer models/tokenizers/akan/unified_tokenizer.json --waxal --test-file data/akan/twi_tts_test.jsonl
+    python scripts/benchmark_fertility.py --tokenizer models/tokenizers/akan/unified_tokenizer.json --waxal --test-file data/akan/twi_tts_test.jsonl
 
     # Compare both
-    python benchmark_fertility.py --tokenizer meta-llama/Llama-3.2-1B --waxal-tokenizer models/tokenizers/akan/unified_tokenizer.json --test-file data/akan/twi_tts_test.jsonl --compare
+    python scripts/benchmark_fertility.py --tokenizer meta-llama/Llama-3.2-1B --waxal-tokenizer models/tokenizers/akan/unified_tokenizer.json --test-file data/akan/twi_tts_test.jsonl --compare
 """
 
 import argparse
@@ -39,7 +39,11 @@ class FertilityResult:
 
     @property
     def fertility_std(self) -> float:
-        return statistics.stdev(self.per_sample_fertilities) if len(self.per_sample_fertilities) > 1 else 0.0
+        return (
+            statistics.stdev(self.per_sample_fertilities)
+            if len(self.per_sample_fertilities) > 1
+            else 0.0
+        )
 
     def to_dict(self) -> dict:
         return {
@@ -139,7 +143,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Token fertility benchmark")
     parser.add_argument("--tokenizer", type=str, help="HuggingFace tokenizer ID (baseline)")
     parser.add_argument("--waxal-tokenizer", type=str, help="Path to unified WAXAL tokenizer JSON")
-    parser.add_argument("--waxal", action="store_true", help="Treat --tokenizer as a WAXAL tokenizer path")
+    parser.add_argument(
+        "--waxal", action="store_true", help="Treat --tokenizer as a WAXAL tokenizer path"
+    )
     parser.add_argument("--compare", action="store_true", help="Run both and show reduction")
     parser.add_argument("--test-file", type=str, required=True)
     parser.add_argument("--max-samples", type=int, default=500)
@@ -170,8 +176,14 @@ def main() -> None:
             return
         reduction = (baseline.fertility - waxal.fertility) / baseline.fertility * 100
         target_met = reduction >= 30.0
-        print(f"\n=== Fertility Reduction: {reduction:.1f}% {'✓ TARGET MET' if target_met else '✗ target: ≥30%'} ===")
-        results = {"baseline": baseline.to_dict(), "waxal": waxal.to_dict(), "reduction_pct": reduction}
+        print(
+            f"\n=== Fertility Reduction: {reduction:.1f}% {'✓ TARGET MET' if target_met else '✗ target: ≥30%'} ==="
+        )
+        results = {
+            "baseline": baseline.to_dict(),
+            "waxal": waxal.to_dict(),
+            "reduction_pct": reduction,
+        }
     elif args.waxal or (args.tokenizer and Path(args.tokenizer).exists()):
         path = args.waxal_tokenizer or args.tokenizer
         result = measure_fertility_waxal(path, texts)

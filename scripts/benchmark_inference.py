@@ -7,14 +7,14 @@ Measures full model inference metrics on the Dell Latitude 7400 (8GB RAM):
 - Memory usage (MB)
 
 Run this locally after exporting to GGUF. Not intended for Colab — use
-benchmark_fertility.py for tokenizer-only evaluation on cloud hardware.
+scripts/benchmark_fertility.py for tokenizer-only evaluation on cloud hardware.
 
 Usage:
     # GGUF model (edge deployment)
-    python benchmark_inference.py --model models/gguf/model-Q4_K_M.gguf --test-file data/akan/twi_tts_test.jsonl
+    python scripts/benchmark_inference.py --model models/gguf/model-Q4_K_M.gguf --test-file data/akan/twi_tts_test.jsonl
 
     # HuggingFace model (pre-export validation)
-    python benchmark_inference.py --model checkpoints/variant_D/final/ --huggingface --test-file data/akan/twi_tts_test.jsonl
+    python scripts/benchmark_inference.py --model checkpoints/variant_D/final/ --huggingface --test-file data/akan/twi_tts_test.jsonl
 """
 
 import argparse
@@ -71,6 +71,7 @@ def get_memory_mb() -> Optional[float]:
     """Get current process RSS memory in MB."""
     try:
         import psutil
+
         return psutil.Process().memory_info().rss / (1024 * 1024)
     except ImportError:
         return None
@@ -115,7 +116,9 @@ def benchmark_huggingface(model_id: str, texts: list[str]) -> InferenceResult:
         import torch
         from transformers import AutoModelForCausalLM, AutoTokenizer
     except ImportError:
-        raise ImportError("transformers and torch required. Install with: pip install transformers torch")
+        raise ImportError(
+            "transformers and torch required. Install with: pip install transformers torch"
+        )
 
     print(f"Loading HuggingFace model: {model_id}")
     tokenizer = AutoTokenizer.from_pretrained(model_id)
@@ -152,10 +155,16 @@ def benchmark_huggingface(model_id: str, texts: list[str]) -> InferenceResult:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Edge inference benchmark")
-    parser.add_argument("--model", type=str, required=True, help="GGUF path or HuggingFace model ID")
-    parser.add_argument("--huggingface", action="store_true", help="Force HuggingFace model loading")
+    parser.add_argument(
+        "--model", type=str, required=True, help="GGUF path or HuggingFace model ID"
+    )
+    parser.add_argument(
+        "--huggingface", action="store_true", help="Force HuggingFace model loading"
+    )
     parser.add_argument("--test-file", type=str, required=True)
-    parser.add_argument("--max-samples", type=int, default=50, help="Max samples (keep low for edge devices)")
+    parser.add_argument(
+        "--max-samples", type=int, default=50, help="Max samples (keep low for edge devices)"
+    )
     parser.add_argument("--output", type=str, help="Save results to JSON")
     args = parser.parse_args()
 

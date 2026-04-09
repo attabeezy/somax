@@ -25,23 +25,31 @@ DATASET_CONFIGS = {
 }
 
 
-def download_split(config_name: str, split: str, output_dir: Path) -> dict:
+def download_split(config_name: str, split: str, output_dir: Path, limit: int = None) -> dict:
     """Download a specific dataset split.
 
     Args:
         config_name: HuggingFace config name (e.g., 'aka_asr').
         split: Split name ('train', 'validation', 'test').
         output_dir: Directory to save data.
+        limit: Maximum number of samples to download.
 
     Returns:
         Metadata about downloaded split.
     """
     from datasets import load_dataset
 
-    print(f"Downloading {config_name}/{split}...")
-    dataset = load_dataset("google/WaxalNLP", config_name, split=split, trust_remote_code=True)
+    print(f"Downloading {config_name}/{split} (streaming mode)...")
+    dataset = load_dataset("google/WaxalNLP", config_name, split=split, streaming=True)
+    
+    # Disable decoding for media columns (audio) to avoid torchcodec dependency
+    dataset = dataset.decode(False)
+    
+    # Remove audio column to avoid downloading audio files
+    dataset = dataset.remove_columns(["audio"])
 
     output_file = output_dir / f"{config_name}_{split}.jsonl"
+    count = 0
     with open(output_file, "w", encoding="utf-8") as f:
         for item in dataset:
             item_dict = {
@@ -52,8 +60,11 @@ def download_split(config_name: str, split: str, output_dir: Path) -> dict:
                 "gender": item.get("gender", ""),
             }
             f.write(json.dumps(item_dict, ensure_ascii=False) + "\n")
+            count += 1
+            if limit and count >= limit:
+                break
 
-    return {"file": str(output_file), "count": len(dataset)}
+    return {"file": str(output_file), "count": count}
 
 
 def main() -> None:
@@ -61,6 +72,7 @@ def main() -> None:
     parser.add_argument("--lang", type=str, default="akan", choices=["akan", "yoruba", "swahili"])
     parser.add_argument("--output", type=str, default="data/")
     parser.add_argument("--splits", type=str, nargs="+", default=["train", "validation", "test"])
+    parser.add_argument("--limit", type=int, default=None, help="Limit the number of samples per split")
     args = parser.parse_args()
 
     output_dir = Path(args.output) / args.lang
@@ -81,7 +93,7 @@ def main() -> None:
         print(f"\n{split_type.upper()} config: {config_name}")
         for split in args.splits:
             try:
-                result = download_split(config_name, split, output_dir)
+                result = download_split(config_name, split, output_dir, args.limit)
                 metadata[split_type][split] = result
                 print(f"  {split}: {result['count']} samples -> {result['file']}")
             except Exception as e:
