@@ -1,4 +1,4 @@
-# somax
+# dual-core
 
 **Tokenizer-only Twi experiments for studying the Tokenization Tax**
 
