@@ -1,4 +1,4 @@
-# somax
+# project-soma
 
 **Eliminating the Tokenization Tax for Twi via Dual-Stream Tokenization**
 
