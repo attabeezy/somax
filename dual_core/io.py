@@ -1,4 +1,4 @@
-"""Low-level file helpers for SOMAX."""
+"""Low-level file helpers for Dual-Core."""
 
 from __future__ import annotations
 

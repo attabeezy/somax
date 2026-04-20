@@ -1,8 +1,8 @@
-"""SOMAX tokenizer-only toolkit for Twi experiments."""
+"""Dual-Core tokenizer-only toolkit for Twi experiments."""
 
-from somax.experiment import ExperimentTokenizer, run_fertility_experiment
-from somax.metrics import FertilityResult, compute_fertility
-from somax.tokenizers import (
+from dual_core.experiment import ExperimentTokenizer, run_fertility_experiment
+from dual_core.metrics import FertilityResult, compute_fertility
+from dual_core.tokenizers import (
     DEFAULT_SPECIAL_TOKENS,
     build_tokenizer_stats,
     load_tokenizer,

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run one unified SOMAX tokenizer fertility experiment."""
+"""Run one unified Dual-Core tokenizer fertility experiment."""
 
 from __future__ import annotations
 
@@ -11,12 +11,12 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from somax.experiment import ExperimentTokenizer, run_fertility_experiment
-from somax.io import write_json
+from dual_core.experiment import ExperimentTokenizer, run_fertility_experiment
+from dual_core.io import write_json
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Run one SOMAX fertility experiment.")
+    parser = argparse.ArgumentParser(description="Run one Dual-Core fertility experiment.")
     parser.add_argument("--experiment-id", required=True, help="Stable identifier for this experiment run.")
     parser.add_argument("--control-tokenizer", required=True, help="Baseline tokenizer reference.")
     parser.add_argument("--asr-tokenizer", required=True, help="ASR tokenizer path.")

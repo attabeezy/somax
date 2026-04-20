@@ -1,4 +1,4 @@
-"""Tokenizer training and loading utilities for SOMAX."""
+"""Tokenizer training and loading utilities for Dual-Core."""
 
 from __future__ import annotations
 

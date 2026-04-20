@@ -1,4 +1,4 @@
-# SOMAX — Project Reference
+# Dual-Core — Project Reference
 **Eliminating the Tokenization Tax for Twi via Dual-Stream Tokenizer Experiments**
 
 **Status:** Phase 1, tokenizer-only  
@@ -10,13 +10,13 @@
 
 ## 1. Vision
 
-SOMAX is a Twi-focused research project investigating the "Tokenization Tax":
+Dual-Core is a Twi-focused research project investigating the "Tokenization Tax":
 the tendency for African languages to require far more tokens than English under
 standard LLM tokenizers, increasing latency, cost, and fragmentation.
 
 The current project is intentionally narrow.
 
-SOMAX is not yet a model-training or deployment project. The current phase only asks:
+Dual-Core is not yet a model-training or deployment project. The current phase only asks:
 
 - can specialized Twi tokenizers outperform a baseline tokenizer?
 - does ASR-style Twi benefit from a different vocabulary than formal Twi?
@@ -63,7 +63,7 @@ The main hypothesis is simple:
 - a tokenizer trained on ASR-style Twi may tokenize ASR-like input more efficiently
 - a tokenizer trained on formal Twi may tokenize formal input more efficiently
 
-Before building routers or model paths, SOMAX first needs to verify that this specialization is real.
+Before building routers or model paths, Dual-Core first needs to verify that this specialization is real.
 
 ---
 
@@ -83,7 +83,7 @@ More concretely:
 
 ## 5. Data Sources
 
-SOMAX uses two Twi datasets:
+Dual-Core uses two Twi datasets:
 
 ### 5.1 WAXAL `aka_asr`
 
@@ -242,7 +242,7 @@ Only after that should the project consider routing or model work.
 The current project should be understood through this simplified structure:
 
 ```text
-somax/
+dual_core/
 ├── data/                        # normalized Twi datasets
 ├── models/                      # trained tokenizer artifacts
 ├── results/                     # benchmark outputs
@@ -250,7 +250,7 @@ somax/
 │   ├── download.py              # dataset download and normalization
 │   ├── train_bpe.py             # tokenizer training
 │   └── benchmark_fertility.py
-├── somax/                       # thin helpers for tokenizer-only experiments
+├── dual_core/                       # thin helpers for tokenizer-only experiments
 ├── tests/
 ├── README.md
 └── project.md
@@ -286,7 +286,7 @@ Optional metadata:
 
 ### 11.3 Benchmark outputs
 
-SOMAX should use one simple rule:
+Dual-Core should use one simple rule:
 
 - one experiment run produces one JSON file
 
@@ -340,7 +340,7 @@ The only thing phase 1 must prove is whether specialized tokenizers for Twi are 
 
 ## 14. Future Directions
 
-If phase 1 shows strong specialization effects, SOMAX can expand in carefully staged steps.
+If phase 1 shows strong specialization effects, Dual-Core can expand in carefully staged steps.
 
 ### 14.1 Router / mux experiment
 
@@ -392,7 +392,7 @@ This should only happen after the tokenizer question is clearly answered.
 
 ## 15. Recommended Near-Term Deliverable
 
-A successful near-term SOMAX deliverable is:
+A successful near-term Dual-Core deliverable is:
 
 1. normalized Twi ASR and TTS datasets
 2. three trained tokenizer variants: ASR, TTS, mixed
@@ -401,3 +401,4 @@ A successful near-term SOMAX deliverable is:
 5. one short conclusion about whether specialization appears real
 
 That is enough for a strong phase-1 outcome.
+strong phase-1 outcome.

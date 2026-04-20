@@ -1,4 +1,4 @@
-"""Dataset loading and normalization helpers for SOMAX."""
+"""Dataset loading and normalization helpers for Dual-Core."""
 
 from __future__ import annotations
 

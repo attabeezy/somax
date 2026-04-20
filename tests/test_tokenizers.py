@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from somax.tokenizers import build_tokenizer_stats, load_tokenizer, train_bpe_tokenizer
+from dual_core.tokenizers import build_tokenizer_stats, load_tokenizer, train_bpe_tokenizer
 
 
 def test_train_bpe_tokenizer_writes_output(tmp_path: Path) -> None:

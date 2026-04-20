@@ -3,14 +3,14 @@ requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "somax"
+name = "dual-core"
 version = "0.1.0"
 description = "Tokenizer-only Twi experiments for studying the Tokenization Tax"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
 authors = [
-    {name = "SOMAX Team"}
+    {name = "Dual-Core Team"}
 ]
 keywords = ["nlp", "tokenization", "twi", "tokenizer", "bpe"]
 classifiers = [
@@ -41,7 +41,7 @@ dev = [
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["somax*"]
+include = ["dual_core*"]
 
 [tool.black]
 line-length = 100

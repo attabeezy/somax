@@ -8,7 +8,7 @@
 ## Overview
 
 Modern LLM tokenizers are optimized for English, resulting in a **Tokenization Tax**
-for languages like Twi. SOMAX keeps the first phase deliberately small:
+for languages like Twi. Dual-Core keeps the first phase deliberately small:
 
 - normalize Twi ASR and formal-text datasets
 - train tokenizer variants for `asr`, `tts`, and `mixed`
@@ -26,7 +26,7 @@ for languages like Twi. SOMAX keeps the first phase deliberately small:
 - `scripts/download.py` - download and normalize Twi datasets into `data/`
 - `scripts/train_bpe.py` - train one tokenizer variant per run
 - `scripts/benchmark_fertility.py` - compare tokenizers in one unified experiment
-- `somax/` - thin helpers for JSONL loading, tokenizer training, fertility metrics, and experiment assembly
+- `dual_core/` - thin helpers for JSONL loading, tokenizer training, fertility metrics, and experiment assembly
 
 ## Quick Start
 
@@ -91,7 +91,7 @@ Lower fertility means the tokenizer needs fewer tokens per word on the same text
 
 ## Output Contract
 
-SOMAX keeps experiment output simple:
+Dual-Core keeps experiment output simple:
 
 - one tokenizer training run writes one tokenizer artifact and one optional stats JSON
 - one benchmark experiment writes one unified JSON
@@ -113,7 +113,7 @@ The unified experiment JSON contains:
 ## Project Structure
 
 ```text
-SOMAX/
+Dual-Core/
 ├── data/                  # Twi datasets (gitignored)
 ├── models/                # Tokenizer artifacts (gitignored)
 ├── results/               # Unified experiment outputs
@@ -121,7 +121,7 @@ SOMAX/
 │   ├── download.py
 │   ├── train_bpe.py
 │   └── benchmark_fertility.py
-├── somax/
+├── dual_core/
 ├── tests/
 ├── pyproject.toml
 ├── Makefile
@@ -139,3 +139,4 @@ SOMAX/
 ## License
 
 This project is licensed under the MIT License.
+e.

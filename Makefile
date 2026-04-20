@@ -33,7 +33,7 @@ benchmark:
 lint:
 	ruff check .
 	black --check .
-	mypy somax/
+	mypy dual_core/
 
 test:
 	pytest tests/ -v

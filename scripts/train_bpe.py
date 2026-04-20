@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Train one BPE tokenizer for a SOMAX variant."""
+"""Train one BPE tokenizer for a Dual-Core variant."""
 
 from __future__ import annotations
 
@@ -11,12 +11,12 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from somax.datasets import load_jsonl_samples, samples_to_texts
-from somax.tokenizers import build_tokenizer_stats, save_tokenizer_stats, train_bpe_tokenizer
+from dual_core.datasets import load_jsonl_samples, samples_to_texts
+from dual_core.tokenizers import build_tokenizer_stats, save_tokenizer_stats, train_bpe_tokenizer
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Train one SOMAX BPE tokenizer.")
+    parser = argparse.ArgumentParser(description="Train one Dual-Core BPE tokenizer.")
     parser.add_argument("--inputs", nargs="+", required=True, help="One or more JSONL input files.")
     parser.add_argument("--output", required=True, help="Tokenizer JSON output path.")
     parser.add_argument("--name", required=True, help="Logical tokenizer name, e.g. asr.")

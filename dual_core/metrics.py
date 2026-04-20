@@ -1,4 +1,4 @@
-"""Metrics used by SOMAX experiments."""
+"""Metrics used by Dual-Core experiments."""
 
 from __future__ import annotations
 

@@ -1,13 +1,13 @@
-"""Experiment orchestration for SOMAX fertility comparisons."""
+"""Experiment orchestration for Dual-Core fertility comparisons."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
 
-from somax.datasets import load_jsonl_samples, samples_to_texts
-from somax.metrics import compute_fertility
-from somax.tokenizers import load_tokenizer
+from dual_core.datasets import load_jsonl_samples, samples_to_texts
+from dual_core.metrics import compute_fertility
+from dual_core.tokenizers import load_tokenizer
 
 
 @dataclass(frozen=True)

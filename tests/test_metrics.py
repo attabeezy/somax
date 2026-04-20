@@ -1,4 +1,4 @@
-from somax.metrics import compute_fertility
+from dual_core.metrics import compute_fertility
 
 
 class DummyTokenizer:
