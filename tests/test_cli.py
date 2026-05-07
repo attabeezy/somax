@@ -58,7 +58,7 @@ def test_train_bpe_cli_and_benchmark_cli(tmp_path: Path) -> None:
             "scripts/benchmark_fertility.py",
             "--experiment-id",
             "exp_cli",
-            "--control-tokenizer",
+            "--baselines",
             str(control_path),
             "--asr-tokenizer",
             str(asr_path),

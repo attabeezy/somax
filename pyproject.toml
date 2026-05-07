@@ -32,6 +32,8 @@ dependencies = [
     "tokenizers>=0.15.0",
     "scikit-learn>=1.4.0",
     "numpy>=1.26.0",
+    "python-dotenv>=1.0.0",
+    "sentencepiece>=0.1.99",
 ]
 
 [project.optional-dependencies]

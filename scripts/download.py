@@ -7,6 +7,10 @@ import argparse
 import sys
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from datasets import load_dataset
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -18,10 +22,14 @@ from akan_bpe.io import write_json, write_jsonl
 
 def _download_asr_split(split: str, limit: int | None) -> list[dict[str, str]]:
     dataset = load_dataset("google/WaxalNLP", "aka_asr", split=split, streaming=True)
+    # Select only the text columns up-front so the audio bytes are never fetched.
     try:
-        dataset = dataset.decode(False).remove_columns(["audio"])
+        dataset = dataset.select_columns(["transcription", "id"])
     except Exception:
-        pass
+        try:
+            dataset = dataset.remove_columns(["audio"])
+        except Exception:
+            pass
 
     rows: list[dict[str, str]] = []
     for index, item in enumerate(dataset):
@@ -74,8 +82,8 @@ def _download_pristine_rows(limit: int | None) -> list[dict[str, str]]:
 
 
 def _split_rows(rows: list[dict[str, str]]) -> dict[str, list[dict[str, str]]]:
-    train_end = int(len(rows) * 0.90)
-    validation_end = int(len(rows) * 0.95)
+    train_end = int(len(rows) * 0.80)
+    validation_end = int(len(rows) * 0.90)
     return {
         "train": rows[:train_end],
         "validation": rows[train_end:validation_end],
@@ -104,8 +112,8 @@ def main() -> None:
 
     manifest: dict[str, object] = {"language": "akan", "files": {}}
 
-    for split in ("train", "validation", "test"):
-        rows = _download_asr_split(split, args.asr_limit)
+    asr_rows = _download_asr_split("train", args.asr_limit)
+    for split, rows in _split_rows(asr_rows).items():
         path = output_dir / f"aka_asr_{split}.jsonl"
         count = write_jsonl(path, rows)
         manifest["files"][path.name] = {"count": count, "source": "aka_asr"}

@@ -168,7 +168,19 @@ def main() -> None:
         print(f"ASR samples: {result['asr_samples']}")
         print(f"TTS samples: {result['tts_samples']}")
         print(f"Total samples: {result['total_samples']}")
+        print(f"Train samples (80%): {result['train_samples']}")
+        print(f"Test samples  (20%): {result['test_samples']}")
         print(f"Train accuracy: {result['train_accuracy']:.4f}")
+        print(f"Test accuracy:  {result['test_accuracy']:.4f}")
+        print("Per-class metrics (test set):")
+        for cls_name, metrics in result["classification_report"].items():
+            if isinstance(metrics, dict):
+                print(
+                    f"  {cls_name}: precision={metrics['precision']:.4f}"
+                    f"  recall={metrics['recall']:.4f}"
+                    f"  f1={metrics['f1-score']:.4f}"
+                    f"  support={int(metrics['support'])}"
+                )
         print(f"Saved to: {result['output_path']}")
 
 

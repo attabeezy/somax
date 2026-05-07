@@ -10,6 +10,8 @@ from typing import Any
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import classification_report as sklearn_classification_report
+from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 
 DOMAIN_ASR = "asr"
@@ -125,17 +127,35 @@ class MLClassifierRouter:
             self.classifier = load_classifier(Path(classifier_path))
 
     def train(self, asr_path: str, tts_path: str, output_path: str) -> dict[str, Any]:
-        """Train the classifier and save to file."""
+        """Train the classifier on 80% split, evaluate on 20% held-out test set."""
         texts, labels = load_training_data(asr_path, tts_path)
-        self.classifier = train_classifier(texts, labels)
+
+        texts_train, texts_test, labels_train, labels_test = train_test_split(
+            texts, labels, test_size=0.20, random_state=42, stratify=labels
+        )
+
+        self.classifier = train_classifier(texts_train, labels_train)
         save_classifier(self.classifier, Path(output_path))
 
-        train_accuracy = self.classifier.score(texts, labels)
+        train_accuracy = self.classifier.score(texts_train, labels_train)
+        test_accuracy = self.classifier.score(texts_test, labels_test)
+        labels_pred = self.classifier.predict(texts_test)
+        report: dict[str, Any] = sklearn_classification_report(
+            labels_test,
+            labels_pred,
+            target_names=[DOMAIN_ASR, DOMAIN_TTS],
+            output_dict=True,
+        )
+
         return {
             "asr_samples": sum(1 for label in labels if label == 0),
             "tts_samples": sum(1 for label in labels if label == 1),
             "total_samples": len(labels),
+            "train_samples": len(labels_train),
+            "test_samples": len(labels_test),
             "train_accuracy": train_accuracy,
+            "test_accuracy": test_accuracy,
+            "classification_report": report,
             "output_path": output_path,
         }
 

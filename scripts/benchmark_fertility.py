@@ -7,12 +7,22 @@ import argparse
 import sys
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from akan_bpe.experiment import ExperimentTokenizer, run_fertility_experiment
 from akan_bpe.io import write_json
+
+_DEFAULT_BASELINES = [
+    "xlm-roberta-base",
+    "bert-base-multilingual-cased",
+    "google/mt5-base",
+]
 
 
 def main() -> None:
@@ -22,7 +32,12 @@ def main() -> None:
         required=True,
         help="Stable identifier for this experiment run.",
     )
-    parser.add_argument("--control-tokenizer", required=True, help="Baseline tokenizer reference.")
+    parser.add_argument(
+        "--baselines",
+        nargs="+",
+        default=_DEFAULT_BASELINES,
+        help="One or more HuggingFace baseline tokenizer identifiers.",
+    )
     parser.add_argument("--asr-tokenizer", required=True, help="ASR tokenizer path.")
     parser.add_argument("--tts-tokenizer", required=True, help="TTS tokenizer path.")
     parser.add_argument("--mixed-tokenizer", help="Optional mixed tokenizer path.")
@@ -37,11 +52,12 @@ def main() -> None:
     parser.add_argument("--output", required=True, help="Unified experiment JSON output path.")
     args = parser.parse_args()
 
-    tokenizers = [
-        ExperimentTokenizer(name="control", reference=args.control_tokenizer),
-        ExperimentTokenizer(name="asr", reference=args.asr_tokenizer),
-        ExperimentTokenizer(name="tts", reference=args.tts_tokenizer),
-    ]
+    tokenizers: list[ExperimentTokenizer] = []
+    for baseline_ref in args.baselines:
+        baseline_name = baseline_ref.split("/")[-1].replace("-", "_")
+        tokenizers.append(ExperimentTokenizer(name=baseline_name, reference=baseline_ref))
+    tokenizers.append(ExperimentTokenizer(name="asr", reference=args.asr_tokenizer))
+    tokenizers.append(ExperimentTokenizer(name="tts", reference=args.tts_tokenizer))
     if args.mixed_tokenizer:
         tokenizers.append(ExperimentTokenizer(name="mixed", reference=args.mixed_tokenizer))
 

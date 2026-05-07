@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from pathlib import Path
 
@@ -21,14 +22,36 @@ def main() -> None:
     parser.add_argument("--output", required=True, help="Tokenizer JSON output path.")
     parser.add_argument("--name", required=True, help="Logical tokenizer name, e.g. asr.")
     parser.add_argument("--vocab-size", type=int, default=8000, help="Target vocabulary size.")
+    parser.add_argument(
+        "--balance",
+        action="store_true",
+        default=False,
+        help="Upsample minority corpus to match majority corpus size before training.",
+    )
     args = parser.parse_args()
 
-    all_samples = []
+    per_file_samples = []
     for input_ref in args.inputs:
         path = Path(input_ref)
         if not path.exists():
             raise FileNotFoundError(f"Input file not found: {path}")
-        all_samples.extend(load_jsonl_samples(path))
+        per_file_samples.append(load_jsonl_samples(path))
+
+    if args.balance and len(per_file_samples) > 1:
+        max_count = max(len(s) for s in per_file_samples)
+        all_samples = []
+        for file_samples in per_file_samples:
+            if not file_samples:
+                continue
+            repeat_times = math.ceil(max_count / len(file_samples))
+            upsampled = (file_samples * repeat_times)[:max_count]
+            all_samples.extend(upsampled)
+        original_counts = [len(s) for s in per_file_samples]
+        print(f"Balanced corpus: original sizes {original_counts}, upsampled to {max_count} each.")
+    else:
+        all_samples = []
+        for file_samples in per_file_samples:
+            all_samples.extend(file_samples)
 
     texts = samples_to_texts(all_samples)
     output_path = Path(args.output)
