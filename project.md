@@ -1,11 +1,11 @@
 # Akan-BPE — Project Reference
 **Eliminating the Tokenization Tax for Akan via BPE Tokenizer Experiments**
 
-**Status:** Phase 1 Complete  
+**Status:** Phase 1 Complete (v0.3.0) — Phase 2 Planning  
 **Scope:** Akan (Twi), tokenizer experiments with ML routing  
-**Completed:** Tokenizer training, fertility benchmarks, router experiments  
-**Current hardware:** CPU or Colab  
-**Future hardware:** Dell Latitude 7400 for edge deployment
+**Completed:** Tokenizer training, fertility benchmarks vs multilingual baselines, balanced mixed tokenizer, router with held-out eval  
+**Current hardware:** CPU / Colab  
+**Next hardware:** GPU for model fine-tuning; Dell Latitude 7400 for edge deployment
 
 ---
 
@@ -30,21 +30,17 @@ Akan-BPE is not yet a model-training or deployment project. The current phase on
 The active scope is tokenizer + routing experiments.
 
 **Completed:**
-- Akan data collection and normalization
+- Akan data collection and normalization (80/10/10 local split for ASR)
 - BPE tokenizer training (ASR, TTS, Mixed)
-- Tokenizer comparison across ASR and formal text
-- Token fertility benchmarking
+- Tokenizer comparison against multilingual baselines (XLM-R, mBERT, mT5)
+- Token fertility benchmarking (~52% ASR reduction, ~47% TTS reduction vs best baseline)
+- Balanced mixed tokenizer (corpus upsampling — now genuinely differentiates domains)
 - Heuristic router implementation
-- ML classifier router (99.9% accuracy)
+- ML classifier router (99.99% train/test accuracy on stratified held-out split)
 
-**Out of scope for now:**
-- Model fine-tuning
-- LoRA training
-- Embedding resizing
-- GGUF export
-- Edge inference benchmarking
-
-These remain future directions, not current deliverables.
+**Next phases:**
+- Model integration (embedding resize, fine-tune, eval)
+- Edge deployment (GGUF export, Dell Latitude 7400 benchmarking)
 
 ---
 
@@ -345,10 +341,11 @@ If phase 1 shows strong specialization effects, Akan-BPE can expand in carefully
 ### 14.1 Router / mux experiment (COMPLETED)
 
 - Implemented heuristic-based router (77.6% accuracy)
-- Trained ML classifier (TF-IDF + Logistic Regression, 99.9% accuracy)
-- Benchmark showed ML router achieves optimal fertility
+- Trained ML classifier (TF-IDF + Logistic Regression, 99.99% train/test accuracy on stratified 80/20 split)
+- Per-class F1: ASR 0.9998, TTS 0.9999
+- Benchmark showed ML router achieves optimal fertility (matches always-best-tokenizer strategy)
 
-**Status:** Complete - ML router significantly outperforms heuristic
+**Status:** Complete - ML router significantly outperforms heuristic; accuracy confirmed on held-out test set
 
 ### 14.2 Incremental tokenizer variants
 
@@ -391,12 +388,108 @@ This should only happen after the tokenizer question is clearly answered.
 
 ## 15. Phase 1 Deliverables (COMPLETE)
 
-1. ✅ normalized Akan ASR and TTS datasets
-2. ✅ three trained tokenizer variants: ASR, TTS, mixed
-3. ✅ baseline comparison against GPT-2 tokenizer
+1. ✅ normalized Akan ASR and TTS datasets (80/10/10 local split)
+2. ✅ three trained tokenizer variants: ASR, TTS, Mixed (corpus-balanced)
+3. ✅ fertility benchmark vs multilingual baselines (XLM-R, mBERT, mT5) — not GPT-2
 4. ✅ unified experiment JSON with fertility comparison
 5. ✅ technical report (report.md) documenting findings
-6. ✅ ML classifier router (99.9% accuracy)
+6. ✅ ML classifier router (99.99% train/test accuracy, stratified held-out eval)
 7. ✅ End-to-end notebook (train_eval.ipynb)
 
-**Conclusion:** Specialization is real - ASR tokenizer reduces tokens by 59%, TTS by 60%.
+**Conclusion:** Specialization is real — ASR tokenizer achieves ~52% fertility reduction, TTS ~47%, both vs best multilingual baseline (mBERT). Balanced mixed tokenizer interpolates between domains (1.20 ASR, 1.27 TTS) and is viable where routing infrastructure is unavailable.
+
+---
+
+## 16. Phase 2: Next Steps
+
+Phase 1 answered the tokenizer question. Phase 2 asks whether those gains translate to a real model.
+
+### 16.1 Model Integration
+
+**Goal:** Verify that fertility reduction translates into measurable downstream benefit — faster inference, lower perplexity, or better generation — not just a smaller token count.
+
+**Recommended base model:** Start small. `Qwen2.5-0.5B` or `LLaMA-3.2-1B` are manageable on Colab Free / CPU for initial experiments. Scale up only if results are promising.
+
+**Steps:**
+
+1. **Choose tokenizer to integrate** — start with the TTS tokenizer (most training data, best-in-class fertility on formal text). The router can be layered in later.
+
+2. **Resize token embeddings**
+   ```python
+   from transformers import AutoModelForCausalLM, AutoTokenizer
+   from tokenizers import Tokenizer
+
+   base_model = AutoModelForCausalLM.from_pretrained("Qwen/Qwen2.5-0.5B")
+   new_tokenizer = PreTrainedTokenizerFast(tokenizer_file="models/tts_tokenizer.json")
+   base_model.resize_token_embeddings(len(new_tokenizer))
+   ```
+   New token embeddings initialize randomly; existing tokens that map to the new vocab keep their weights where possible.
+
+3. **Re-tokenize training data** — run `pristine_twi_train.jsonl` through the new tokenizer to produce training inputs for fine-tuning.
+
+4. **Fine-tune** — LoRA is the practical choice on limited hardware. Full fine-tune only if GPU VRAM allows.
+   - Library: `peft` + `transformers` Trainer or `trl` SFTTrainer
+   - Target modules: attention Q/K/V projections
+   - Rank: r=8 or r=16 to start
+
+5. **Evaluate**
+   - **Perplexity** on `pristine_twi_test.jsonl` — compare base model (original tokenizer) vs fine-tuned (new tokenizer)
+   - **Generation quality** — BLEU or chrF on a small Akan reference set if available; otherwise qualitative review
+   - **Inference speed** — tokens/second before and after to quantify the fertility gain in practice
+
+**Success criterion:** Fine-tuned model with new tokenizer matches or exceeds base model perplexity on Akan test text, with fewer tokens processed per sample.
+
+**Failure mode to watch for:** If perplexity is significantly worse after embedding resize, the initialization strategy needs work (e.g., averaging subword embeddings from the original vocab that cover similar character sequences).
+
+---
+
+### 16.2 Edge Deployment
+
+**Goal:** Benchmark tokenizer + router + model on the Dell Latitude 7400 to understand real-world latency and memory footprint.
+
+**Prerequisite:** Model integration (16.1) must produce a usable model artifact first.
+
+**Steps:**
+
+1. **Export to GGUF**
+   ```bash
+   python llama.cpp/convert_hf_to_gguf.py models/akan_tts_model/ --outtype q4_k_m
+   ```
+   Q4_K_M quantization is a good starting point — balances quality and size for a 0.5–1B model.
+
+2. **Bundle the router** — the router classifier (`models/router_classifier.pkl`) adds ~1ms per call; confirm this overhead is negligible on the target hardware.
+
+3. **Benchmark on Dell Latitude 7400**
+
+   Metrics to collect:
+   | Metric | Tool |
+   |--------|------|
+   | Tokens/second | `llama-bench` or manual timing |
+   | Peak RAM | `psutil` or Task Manager |
+   | Time-to-first-token | manual timing in Python |
+   | Router overhead | `time.perf_counter()` around `classifier.predict()` |
+
+4. **Compare configurations**
+   - Base model, original tokenizer (GPT-2 vocab)
+   - Fine-tuned model, Akan TTS tokenizer
+   - Fine-tuned model + ML router (dynamic tokenizer selection)
+
+**Success criterion:** Fine-tuned Akan model generates tokens faster (more tokens/second or fewer tokens per prompt) than the base model on Akan input, with acceptable RAM footprint for the target hardware.
+
+---
+
+### 16.3 Sequencing
+
+```
+Phase 1 (DONE)
+    └── Phase 2A: Model Integration
+            ├── Pick base model
+            ├── Resize + LoRA fine-tune on TTS data
+            ├── Eval perplexity + generation quality
+            └── Phase 2B: Edge Deployment
+                    ├── GGUF export
+                    ├── Bundle router
+                    └── Benchmark on Dell Latitude 7400
+```
+
+Phase 2B is blocked on Phase 2A. Do not start edge deployment until there is a working fine-tuned model artifact to benchmark.
