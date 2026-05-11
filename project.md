@@ -408,7 +408,20 @@ Phase 1 answered the tokenizer question. Phase 2 asks whether those gains transl
 
 **Goal:** Verify that fertility reduction translates into measurable downstream benefit — faster inference, lower perplexity, or better generation — not just a smaller token count.
 
-**Recommended base model:** Start small. `Qwen2.5-0.5B` or `LLaMA-3.2-1B` are manageable on Colab Free / CPU for initial experiments. Scale up only if results are promising.
+**Hardware baseline:** Free Kaggle/Colab GPU, typically T4/P100-class. Train and evaluate the smaller models first; treat larger models as QLoRA-only or reference-only unless paid GPU access is available.
+
+**Model ladder:**
+
+| Phase | Model | Role | Free-GPU feasibility |
+|---|---|---|---|
+| **2A1** | `Qwen/Qwen3-0.6B` | Pipeline smoke test: tokenizer replacement, embedding resize, LoRA/QLoRA loop, eval plumbing, save/load | Feasible |
+| **2A2** | `Qwen/Qwen3-1.7B` | Main small-model experiment after 2A1 proves the path | Feasible with LoRA/QLoRA |
+| **2A3** | `google/gemma-3-1b-*` | Broad multilingual vendor/architecture comparison | Feasible; check Gemma license and PT/IT choice |
+| **2A4** | `meta-llama/Llama-3.2-1B` or `meta-llama/Llama-3.2-3B` | Deployment ecosystem comparison | 1B feasible; 3B QLoRA with conservative settings |
+| **2A5** | `CohereLabs/tiny-aya-earth` | Africa/West Asia-focused multilingual experiment | QLoRA-only; CC-BY-NC research/non-commercial license |
+| **2A6** | `microsoft/Phi-4-mini-instruct` or `CohereLabs/aya-expanse-8b` | Stretch/reference tier: Phi for edge-quality upper bound, Aya Expanse for multilingual reference | Phi QLoRA stretch; Aya Expanse inference/reference-only |
+
+`Qwen2.5-0.5B` remains a fallback only if Qwen3 tooling causes friction. Tiny Aya Earth replaces Aya Expanse 8B as the primary Aya-family candidate because it is smaller, Africa/West Asia-focused, and designed for local deployment under realistic compute constraints.
 
 **Steps:**
 
@@ -416,10 +429,9 @@ Phase 1 answered the tokenizer question. Phase 2 asks whether those gains transl
 
 2. **Resize token embeddings**
    ```python
-   from transformers import AutoModelForCausalLM, AutoTokenizer
-   from tokenizers import Tokenizer
+   from transformers import AutoModelForCausalLM, PreTrainedTokenizerFast
 
-   base_model = AutoModelForCausalLM.from_pretrained("Qwen/Qwen2.5-0.5B")
+   base_model = AutoModelForCausalLM.from_pretrained("Qwen/Qwen3-0.6B")
    new_tokenizer = PreTrainedTokenizerFast(tokenizer_file="models/tts_tokenizer.json")
    base_model.resize_token_embeddings(len(new_tokenizer))
    ```
@@ -436,6 +448,8 @@ Phase 1 answered the tokenizer question. Phase 2 asks whether those gains transl
    - **Perplexity** on `pristine_twi_test.jsonl` — compare base model (original tokenizer) vs fine-tuned (new tokenizer)
    - **Generation quality** — BLEU or chrF on a small Akan reference set if available; otherwise qualitative review
    - **Inference speed** — tokens/second before and after to quantify the fertility gain in practice
+
+6. **Record experiment output** — save one structured JSON per run under `results/`, including model ID, tokenizer path, dataset paths, fertility, perplexity, generation samples, timing, hardware, and memory notes.
 
 **Success criterion:** Fine-tuned model with new tokenizer matches or exceeds base model perplexity on Akan test text, with fewer tokens processed per sample.
 
@@ -483,9 +497,14 @@ Phase 1 answered the tokenizer question. Phase 2 asks whether those gains transl
 ```
 Phase 1 (DONE)
     └── Phase 2A: Model Integration
-            ├── Pick base model
-            ├── Resize + LoRA fine-tune on TTS data
-            ├── Eval perplexity + generation quality
+            ├── 2A1 Qwen3-0.6B pipeline smoke test
+            ├── 2A2 Qwen3-1.7B main small-model experiment
+            ├── 2A3 Gemma 3 1B multilingual comparison
+            ├── 2A4 Llama 3.2 1B/3B deployment comparison
+            ├── 2A5 Tiny Aya Earth Africa-focused QLoRA experiment
+            ├── 2A6 Phi/Aya Expanse stretch/reference tier
+            ├── Resize + LoRA/QLoRA fine-tune on TTS data
+            ├── Eval fertility, perplexity, generation quality, timing
             └── Phase 2B: Edge Deployment
                     ├── GGUF export
                     ├── Bundle router
