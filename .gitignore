@@ -14,7 +14,13 @@ build/
 *.pt
 *.bin
 *.gguf
-models/
+# model binary weights and trained adapter dirs (large, not tracked)
+models/*.pt
+models/*.bin
+models/*.gguf
+models/phase2a*/
+models/checkpoints/
+# results are generated artifacts
 results/
 checkpoints/
 logs/
