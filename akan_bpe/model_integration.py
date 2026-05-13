@@ -262,7 +262,6 @@ def _build_model_and_training_args(
     ensure_parent_dir(output_dir / "adapter_config.json")
     training_args = training_arguments_cls(
         output_dir=str(output_dir),
-        overwrite_output_dir=True,
         per_device_train_batch_size=config.batch_size,
         per_device_eval_batch_size=config.batch_size,
         gradient_accumulation_steps=config.grad_accum,
