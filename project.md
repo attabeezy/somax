@@ -1,7 +1,7 @@
 # Akan-BPE — Project Reference
 **Eliminating the Tokenization Tax for Akan via BPE Tokenizer Experiments**
 
-**Status:** Phase 1 Complete (v0.3.0) — Phase 2 Planning  
+**Status:** Phase 2A In Progress (v0.2.0) — 2A1 scaffold complete  
 **Scope:** Akan (Twi), tokenizer experiments with ML routing  
 **Completed:** Tokenizer training, fertility benchmarks vs multilingual baselines, balanced mixed tokenizer, router with held-out eval  
 **Current hardware:** CPU / Colab  
@@ -356,15 +356,16 @@ If basic A/B/C results are promising, the project can revisit staged corpus idea
 
 These should only be attempted after the simpler comparisons are complete.
 
-### 14.3 Model integration
+### 14.3 Model integration (IN PROGRESS — Phase 2A)
 
-If specialized tokenizers clearly help, a later phase may explore:
+Phase 2A1 scaffold is implemented. The repo now contains:
 
-- resizing model vocabularies
-- initializing embeddings for new tokenizer vocabularies
-- comparing specialized model paths
+- `akan_bpe/model_integration.py` — dataset prep, tokenizer/model loading, token-count comparison, LoRA/QLoRA setup, eval, generation samples, JSON artifact creation
+- `scripts/model_integration.py` — CLI-driven experiment runner
+- `phase2a_qwen3_tts_colab.ipynb` — first Colab GPU run targeting `Qwen/Qwen3-0.6B`
+- `tests/test_model_integration.py` — CPU-safe orchestration and artifact-contract coverage
 
-This is a separate project phase and should not be merged into the current tokenizer-only work.
+Next step is running the first real Colab experiment (2A1) before advancing to 2A2 (Qwen3-1.7B).
 
 ### 14.4 Edge deployment
 
